@@ -48,19 +48,33 @@ locals {
     "PROJECT_ID" : module.gitlab_cicd.project_id,
     "CICD_RUNNER_REPO" : var.gl_repos.cicd_runner,
     "WIF_PROVIDER_NAME" : module.gitlab_oidc.provider_name,
-    "TF_BACKEND" : module.seed_bootstrap.gcs_bucket_tfstate,
     "TF_VAR_gitlab_token" : var.gitlab_token,
   }
 
+  backend_buckets = {
+    "bootstrap" = module.seed_bootstrap.gcs_bucket_tfstate
+    "org"       = module.seed_bootstrap.gcs_bucket_tfstate
+    "env"       = module.seed_bootstrap.gcs_bucket_tfstate
+    "net"       = module.seed_bootstrap.gcs_bucket_tfstate
+    "proj"      = module.gcp_projects_state_bucket.bucket.name
+  }
+
   vars_list = flatten([
-    for k, v in local.gl_config : [
+    for k, v in local.gl_config : concat([
       for name, value in local.common_vars : {
         config     = k
         name       = name
         value      = value
         repository = v
       }
-    ]
+      ], [
+      {
+        config     = k
+        name       = "TF_BACKEND"
+        value      = local.backend_buckets[k]
+        repository = v
+      }
+    ])
   ])
 
   sa_vars = [for k, v in local.gl_config : {
